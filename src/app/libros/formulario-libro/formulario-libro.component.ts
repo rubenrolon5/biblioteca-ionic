@@ -1,7 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { ToastController } from '@ionic/angular';
 import { Autor } from 'src/app/interfaces/autor.interface';
+import { Libro } from 'src/app/interfaces/libro.interface';
 import { AutoresService } from 'src/app/servicios/autores.service';
+import { LibrosService } from 'src/app/servicios/libros.service';
 
 @Component({
   selector: 'app-formulario-libro',
@@ -10,20 +13,22 @@ import { AutoresService } from 'src/app/servicios/autores.service';
 })
 
 export class FormularioLibroComponent implements OnInit {
+ 
+  @Output()
+  recargar = new EventEmitter<boolean>();
   public listaAutores: Autor[] = [];
 
-  public id: number | null = null;
-  public titulo: string | null = null;
-  public idautor: number | null = null;
-  public idValidado: boolean = true;
-  public tituloValidado: boolean = true;
-  public idautorValidado: boolean = true;
-  public paginasValidado: boolean = true;
-
-  paginas: any;
+  public form: FormGroup = new FormGroup({
+    idCtrl: new FormControl<number>(null, Validators.required),
+    tituloCtrl: new FormControl<string>(null, Validators.required),
+    idautorCtrl: new FormControl<number>(null, Validators.required),
+    paginasCtrl: new FormControl<number>(null, Validators.required),
+  });
+ 
   constructor(
     private servicioAutores: AutoresService,
-    private serviciosToast: ToastController
+    private serviciosToast: ToastController,
+    private sevicioLibros: LibrosService
   ) { }
   private cargarAutores() {
     this.servicioAutores.get().subscribe({
@@ -44,13 +49,38 @@ export class FormularioLibroComponent implements OnInit {
     this.cargarAutores();
   }
   guardar() {
-    this.validar();
+    this.form.markAllAsTouched();
+    if (this.form.valid) {
+      this.registrar();
+    }
   }
-  private validar(): boolean {
-    this.idValidado = this.id !== null;
-    this.tituloValidado = this.idautor != null && this.titulo.length > 0;
-    this.idautorValidado = this.idautor !== null;
-    this.paginasValidado = this.paginas !== null && this.paginas > 0;
-    return this.idValidado && this.tituloValidado && this.idautorValidado && this.paginasValidado
+  private registrar() {
+    const libro: Libro = {
+      idlibro: this.form.controls.idCtrl.value,
+      titulo: this.form.controls.tituloCtrl.value,
+      idautor: this.form.controls.idautorCtrl.value,
+      paginas: this.form.controls.paginasCtrl.value,
+      autor: null
+  }
+  this.sevicioLibros.post(libro).subscribe({
+    next: () => {
+      this.recargar.emit(true);
+      this.serviciosToast.create({
+        header: 'Exito',
+        message: 'Se registro correctamente el libro',
+        duration: 2000,
+        color: 'success'
+      }).then(t => t.present());
+    },
+    error: (e) => {
+      console.error('Error al registrar libro', e);
+      this.serviciosToast.create({
+        header: 'Error al registrar',
+        message: e.message,
+        duration: 3500,
+        color: 'danger',
+      }).then(t => t.present());
+    }
+  });
   }
 }
